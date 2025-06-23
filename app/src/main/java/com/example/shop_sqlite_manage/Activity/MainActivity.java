@@ -1,7 +1,8 @@
-package com.example.shop_sqlite_manage;
+package com.example.shop_sqlite_manage.Activity;
 
 import android.app.AlertDialog;
 import android.content.ContentValues;
+import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.method.PasswordTransformationMethod;
@@ -12,6 +13,8 @@ import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.Toast;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
@@ -20,12 +23,14 @@ import com.example.shop_sqlite_manage.Adapter.UserAdapter;
 import com.example.shop_sqlite_manage.Adapter.UserDataManager;
 import com.example.shop_sqlite_manage.Entity.User;
 import com.example.shop_sqlite_manage.Provider.UserContract;
+import com.example.shop_sqlite_manage.R;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity implements UserAdapter.OnUserClickListener {
 
+    private ActivityResultLauncher<Intent> userFormLauncher;
     private RecyclerView recyclerView;
     private UserAdapter userAdapter;
     private UserDataManager userDataManager;
@@ -46,6 +51,16 @@ public class MainActivity extends AppCompatActivity implements UserAdapter.OnUse
 
         userDataManager = new UserDataManager(this);
         loadAllUsers();
+
+        userFormLauncher = registerForActivityResult(
+                new ActivityResultContracts.StartActivityForResult(),
+                result -> {
+                    if (result.getResultCode() == RESULT_OK) {
+                        loadAllUsers(); // refresh lại danh sách khi quay về
+                    }
+                }
+        );
+
     }
 
     private void initViews() {
@@ -64,7 +79,7 @@ public class MainActivity extends AppCompatActivity implements UserAdapter.OnUse
     }
 
     private void setupListeners() {
-        btnAddUser.setOnClickListener(v -> showAddUserDialog());
+        btnAddUser.setOnClickListener(v -> showAddUserScreen());
         btnRefresh.setOnClickListener(v -> loadAllUsers());
         btnSearch.setOnClickListener(v -> searchUser());
     }
@@ -101,29 +116,12 @@ public class MainActivity extends AppCompatActivity implements UserAdapter.OnUse
         }
     }
 
-    private void showAddUserDialog() {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_add_user, null);
-
-        EditText etUsername = dialogView.findViewById(R.id.et_dialog_username);
-        EditText etPassword = dialogView.findViewById(R.id.et_dialog_password);
-
-        builder.setView(dialogView)
-                .setTitle("Thêm User Mới")
-                .setPositiveButton("Thêm", (dialog, which) -> {
-                    String username = etUsername.getText().toString().trim();
-                    String password = etPassword.getText().toString().trim();
-
-                    if (username.isEmpty() || password.isEmpty()) {
-                        Toast.makeText(this, "Vui lòng điền đầy đủ thông tin", Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-
-                    addUser(username, password);
-                })
-                .setNegativeButton("Hủy", null)
-                .show();
+    private void showAddUserScreen() {
+        Intent intent = new Intent(this, UserFormActivity.class);
+        userFormLauncher.launch(intent);
     }
+
+
 
     private void addUser(String username, String password) {
         ContentValues values = new ContentValues();
@@ -145,7 +143,7 @@ public class MainActivity extends AppCompatActivity implements UserAdapter.OnUse
 
     @Override
     public void onEditUser(User user, int position) {
-        showEditUserDialog(user, position);
+        showEditUserScreen(user);
     }
 
     @Override
@@ -157,38 +155,11 @@ public class MainActivity extends AppCompatActivity implements UserAdapter.OnUse
                 .setNegativeButton("Hủy", null)
                 .show();
     }
-
-    private void showEditUserDialog(User user, int position) {
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_add_user, null);
-
-        EditText etUsername = dialogView.findViewById(R.id.et_dialog_username);
-        EditText etPassword = dialogView.findViewById(R.id.et_dialog_password);
-
-        // Đổ dữ liệu sẵn vào
-        etUsername.setText(user.getAccount());
-        etPassword.setText(user.getPassword());
-
-        // Không cho chỉnh sửa username
-        etUsername.setEnabled(false);
-        etUsername.setFocusable(false);
-        etUsername.setCursorVisible(false);
-
-        builder.setView(dialogView)
-                .setTitle("Sửa User")
-                .setPositiveButton("Cập nhật", (dialog, which) -> {
-                    String password = etPassword.getText().toString().trim();
-
-                    if (password.isEmpty()) {
-                        Toast.makeText(this, "Vui lòng nhập mật khẩu", Toast.LENGTH_SHORT).show();
-                        return;
-                    }
-
-                    // Username không đổi
-                    updateUser(user.getAccount(), user.getAccount(), password, position);
-                })
-                .setNegativeButton("Hủy", null)
-                .show();
+    private void showEditUserScreen(User user) {
+        Intent intent = new Intent(this, UserFormActivity.class);
+        intent.putExtra("username", user.getAccount());
+        intent.putExtra("password", user.getPassword());
+        userFormLauncher.launch(intent);
     }
 
 
@@ -233,6 +204,14 @@ public class MainActivity extends AppCompatActivity implements UserAdapter.OnUse
             }
         } catch (Exception e) {
             Toast.makeText(this, "Lỗi: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (resultCode == RESULT_OK) {
+            loadAllUsers();
         }
     }
 }
